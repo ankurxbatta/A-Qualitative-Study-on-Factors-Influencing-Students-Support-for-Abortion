@@ -1,0 +1,714 @@
+---
+title: "Model 404"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Load and Prepare Data
+
+```{r}
+Students <- read.table("Students.dat", header = TRUE)
+attach(Students)
+head(Students)
+```
+
+```{r}
+library(tidyverse)
+
+students <- read.table("Students.dat", header = TRUE)
+students$abor <- as.factor(students$abor)
+
+# Select numeric variables except abor
+numeric_vars <- names(students)[sapply(students, is.numeric)]
+numeric_vars <- setdiff(numeric_vars, "abor")
+
+# Standardize all numeric variables
+students_scaled <- students
+students_scaled[numeric_vars] <- scale(students[numeric_vars])
+
+# Convert to long format
+long_data <- students_scaled %>%
+  pivot_longer(cols = numeric_vars,
+               names_to = "variable",
+               values_to = "value")
+
+# Plot
+ggplot(long_data, aes(x = variable, y = value, fill = abor)) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.size = 0.7) +
+  labs(
+    x = "Independent variables",
+    y = "Standardized value (Z score)",
+    title = "Combined boxplot of standardized variables by abortion"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+```
+
+```{r}
+# Create affil2: Republican dummy variable
+affil2 <- ifelse(affil == 2, 1, 0)  # 1 = Republican, 0 = otherwise
+
+# Create religdummy: Religious dummy variable
+religdummy <- ifelse(relig == 3, 1, 0)  # 1 = relig is 3, 0 = otherwise
+
+# Check the distributions
+table(affil2)
+table(religdummy)
+```
+
+```{r}
+library(gridExtra)
+# News by Abortion
+p1 <- ggplot(Students, aes(x = factor(abor), y = news, fill = factor(abor))) +
+  geom_boxplot() +
+  labs(title = "News by Abortion", x = "Abortion", y = "News") +
+  theme_minimal()
+
+# religion by Abortion
+p2 <- ggplot(Students, aes(x = factor(abor), y = religdummy, fill = factor(abor))) +
+  geom_boxplot() +
+  labs(title = "Religion by Abortion", x = "Abortion", y = "Religion Dummy") +
+  theme_minimal()
+
+
+# Affiliation by Abortion
+p3 <- ggplot(Students, aes(x = factor(abor), y = affil2, fill = factor(abor))) +
+  geom_boxplot() +
+  labs(title = "Republican by Abortion", x = "Abortion", y = "Republican") +
+  theme_minimal()
+
+# Life by Abortion
+p4 <- ggplot(Students, aes(x = factor(abor), y = life, fill = factor(abor))) +
+  geom_boxplot() +
+  labs(title = "Life by Abortion", x = "Abortion", y = "Life") +
+  theme_minimal()
+
+# Ideol by Abortion
+p5 <- ggplot(Students, aes(x = factor(abor), y = ideol, fill = factor(abor))) +
+  geom_boxplot() +
+  labs(title = "Ideology by Abortion", x = "Abortion", y = "Ideology") +
+  theme_minimal()
+
+grid.arrange(p1, p2, p3, p4, p5, ncol = 2)
+```
+
+```{r}
+# Check the distribution of the response variable
+table(abor)
+
+# Number of observations in each category
+length(abor[which(abor==1)])
+length(abor[which(abor==0)])
+```
+**Interpretation:** The data set is fairly imbalanced, with roughly 3.6 the amount of students who supported abortion in the first 3 months of pregnancy, than those who did not support it. Based off of guidelines, the data set should contain at least 10 outcomes of each type for every explanatory variable, meaning that our model should only have 1 explanatory variable. This is conservative and might be unrealistic since we can't collect more data and still need to make an accurate model, which might have more terms.   
+
+# Manual Stepwise Regression Process
+
+##Purposeful Selection
+
+#Fit the Null Model (Model 1)
+
+The null model contains only the intercept.
+
+```{r}
+Model1 <- glm(abor ~ 1, family=binomial, data=Students)
+summary(Model1)
+```
+
+
+## Test Each Predictor Individually
+
+Fit separate models with each predictor as the sole explanatory
+variable.
+
+```{r}
+# Test all predictors individually
+psgender= glm(abor~factor(gender),family=binomial, data=Students) 
+#summary(psgender) #p-value .2863
+psage= glm(abor~age,family=binomial, data=Students) 
+#summary(psage) #p-value 0.946
+pshsgpa= glm(abor~hsgpa,family=binomial, data=Students) 
+#summary(pshsgpa) #p-value 0.788
+pscogpa= glm(abor~cogpa,family=binomial, data=Students) 
+#summary(pscogpa) #p-value 0.534
+psdhome= glm(abor~dhome,family=binomial, data=Students) 
+#summary(psdhome) #p-value 0.3081
+psdres= glm(abor~dres,family=binomial, data=Students) 
+#summary(psdres) #p-value 0.37114
+pstv= glm(abor~tv,family=binomial, data=Students) 
+#summary(pstv) #p-value  0.143
+pssport= glm(abor~sport,family=binomial, data=Students) 
+#summary(pssport) #p-value 0.58502
+psnews= glm(abor~news,family=binomial, data=Students) 
+#summary(psnews) #p-value 0.0226
+psaids= glm(abor~aids,family=binomial, data=Students) 
+#summary(psaids) #p-value 0.832161
+psveg= glm(abor~veg,family=binomial, data=Students)
+#summary(psveg) #p-value 0.417411
+psaffil= glm(abor~factor(affil),family=binomial, data=Students)
+#summary(psaffil) #p-value  0.00316 for affil2
+psideol= glm(abor~ideol,family=binomial, data=Students)
+#summary(psideol) #p-value= 0.000498
+psrelig= glm(abor~factor(relig),family=binomial, data=Students)
+#summary(psrelig) #p-value 0.00295 for relig3
+psaffirm= glm(abor~affirm,family=binomial, data=Students)
+#summary(psaffirm) #p-value 0.0269
+pslife= glm(abor~factor(life),family=binomial, data=Students)
+#summary(pslife) #p-value 0.0666 for life2, high for other classes of life 
+```
+
+```{r}
+# Likelihood Ratio Tests vs Null Model
+cat("=== Testing Each Predictor vs Null Model ===\n\n")
+
+cat("Gender:\n")
+anova(Model1, psgender, test="LRT")
+
+cat("\nAge:\n")
+anova(Model1, psage, test="LRT")
+
+cat("\nHS GPA:\n")
+anova(Model1, pshsgpa, test="LRT")
+
+cat("\nCollege GPA:\n")
+anova(Model1, pscogpa, test="LRT")
+
+cat("\nDistance from Home:\n")
+anova(Model1, psdhome, test="LRT")
+
+cat("\nDistance from Residence:\n")
+anova(Model1, psdres, test="LRT")
+
+cat("\nTV:\n")
+anova(Model1, pstv, test="LRT")
+
+cat("\nSport:\n")
+anova(Model1, pssport, test="LRT")
+
+cat("\nNews (SIGNIFICANT):\n")
+anova(Model1, psnews, test="LRT")
+
+cat("\nAIDS:\n")
+anova(Model1, psaids, test="LRT")
+
+cat("\nVegetarian:\n")
+anova(Model1, psveg, test="LRT")
+
+cat("\nAffiliation (SIGNIFICANT):\n")
+anova(Model1, psaffil, test="LRT")
+
+cat("\nIdeology (SIGNIFICANT):\n")
+anova(Model1, psideol, test="LRT")
+
+cat("\nReligion (SIGNIFICANT):\n")
+anova(Model1, psrelig, test="LRT")
+
+cat("\nAffirmative Action:\n")
+anova(Model1, psaffirm, test="LRT")
+
+cat("\nLife (SIGNIFICANT):\n")
+anova(Model1, pslife, test="LRT")
+```
+**Interpretation:**
+Based on the tests above, we focus on the significant predictors (p \<0.2): 
+- news 
+- affil
+- relig 
+- ideol 
+- life 
+- affirm
+
+#Create Dummy Variables: Based off of the summaries for the sole predictor models, we will make the following dummy viariables, to account for more significant classes
+```{r}
+# Create affil2: Republican dummy variable
+affil2 <- ifelse(affil == 2, 1, 0)  # 1 = Republican, 0 = otherwise
+
+# Create religdummy: Religious dummy variable
+religdummy <- ifelse(relig == 3, 1, 0)  # 1 = relig is 3, 0 = otherwise
+
+lifedummy=ifelse(Students$life==1,1,0)
+```
+
+### Model 2: News Only
+
+```{r}
+Model2 <- glm(abor ~ news, family=binomial, data=Students)
+summary(Model2)
+```
+
+### Model 3: Affil2 Only (Republican)
+
+```{r}
+Model3 <- glm(abor ~ affil2, family=binomial, data=Students)
+summary(Model3)
+```
+
+### Model 4: Religdummy Only
+
+```{r}
+Model4 <- glm(abor ~ religdummy, family=binomial, data=Students)
+summary(Model4)
+```
+
+### Model 5: Ideol Only
+
+```{r}
+Model5 <- glm(abor ~ ideol, family=binomial, data=Students)
+summary(Model5)
+```
+
+### Model 6: Life Only
+
+```{r}
+Model6 <- glm(abor ~ lifedummy, family=binomial, data=Students)
+summary(Model6)
+```
+
+### Model 7: Affirm Only
+
+```{r}
+Model7 <- glm(abor ~ affirm, family=binomial, data=Students)
+summary(Model7)
+```
+
+## Step 4: Compare Single-Predictor Models to Null Model
+
+$H_0:$ Null Model is better
+
+$H_a:$ Model with variable is better
+
+```{r}
+cat("=== Comparing Significant Single-Predictor Models to Null ===\n\n")
+
+cat("News vs Null:\n")
+anova(Model1, Model2, test="LRT")
+
+cat("\nAffil2 vs Null:\n")
+anova(Model1, Model3, test="LRT")
+
+cat("\nReligdummy vs Null:\n")
+anova(Model1, Model4, test="LRT")
+
+cat("\nIdeol vs Null:\n")
+anova(Model1, Model5, test="LRT")
+
+cat("\nLife vs Null:\n")
+anova(Model1, Model6, test="LRT")
+
+cat("\nAffirm vs Null:\n")
+anova(Model1, Model7, test="LRT")
+```
+
+**Decision:** All p-values are less than the alpha of .05, so we will keep all of these variaibles for the initial main effects model. Based off of the p-vlaues, we have enough statistical evidence to say that the models with the sole explanatory variable are better.  
+
+| Model | Explanatory Variables | Deviance | df  | AIC   |
+|-------|-----------------------|----------|-----|-------|
+| 1     | None                  | 62.72    | 59  | 64.72 |
+| 2     | *N*                   | 55.39    | 58  | 59.39 |
+| 3     | *A*                   | 47.19    | 58  | 51.19 |
+| 4     | *R*                   | 46.48    | 58  | 50.48 |
+| 5     | *AF*                  | 45.46    | 58  | 61.79 |
+| 6     | *I*                   | 50.08    | 58  | 49.46 |
+| 7     | *L*                   | 57.79    | 58  | 54.08 |
+
+Note: N = news, A= affil, R = relig, AF = affirm, I = ideol, L = life
+
+#Step 1 Final: Build initial main effects model
+
+```{r}
+init= glm(abor~news+affil2+religdummy+affirm+ideol+lifedummy,family=binomial, data=Students)
+summary(init)
+```
+
+#Step 2- Backwards Elimination
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with news is better
+
+```{r}
+remnews= glm(abor~+affil2+religdummy+affirm+ideol+lifedummy,family=binomial, data=Students)
+anova(remnews,init, test="LRT")
+#or
+Gnews=remnews$deviance-init$deviance
+Gnews
+dfnews=remnews$df.residual-init$df.residual
+dfnews
+pvaluenews=pchisq(Gnews,dfnews,lower.tail = FALSE)
+pvaluenews
+```
+
+#Backwards Elimination- keep news, test affil2
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with affil2 is better
+
+```{r}
+baseline1= glm(abor~news+affil2+religdummy+affirm+ideol+lifedummy,family=binomial, data=Students)
+remaffil2= glm(abor~news+religdummy+affirm+ideol+lifedummy,family=binomial, data=Students)
+anova(remaffil2, baseline1, test="LRT")
+
+Gaffil2=remaffil2$deviance-baseline1$deviance
+Gaffil2
+dfaffil2=remaffil2$df.residual-baseline1$df.residual
+dfaffil2
+pvalueaffil2=pchisq(Gaffil2,dfaffil2,lower.tail = FALSE)
+pvalueaffil2
+
+
+```
+
+##Backwards Elimination- drop affil2, test relig
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with religdummy is better
+
+```{r}
+baseline2= glm(abor~news+religdummy+affirm+ideol+lifedummy,family=binomial, data=Students)
+remrelig= glm(abor~news+affirm+ideol+lifedummy,family=binomial, data=Students)
+anova(remrelig, baseline2,  test="LRT")#p-value=0.05561, consider removing relig?? 
+
+```
+
+##Backwards Elimination- keep relig, test affirm
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with affirm is better
+
+```{r}
+baseline4= glm(abor~news+religdummy+affirm+ideol+lifedummy,family=binomial, data=Students)
+remaffirm= glm(abor~news+religdummy+ideol+lifedummy,family=binomial, data=Students)
+anova(remaffirm, baseline4, test="LRT") 
+
+```
+
+##Backwards Elimination- remove affirm, test ideol
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with ideol is better
+
+```{r}
+baseline5= glm(abor~news+religdummy+ideol+lifedummy,family=binomial, data=Students)
+remideol= glm(abor~news+religdummy+lifedummy,family=binomial, data=Students)
+anova(remideol, baseline5, test="LRT")
+```
+
+##Backwards Elimination- keep ideol, test lifedummy
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with lifedummy is better
+
+```{r}
+baseline6= glm(abor~news+religdummy+ideol+lifedummy,family=binomial, data=Students)
+remlifedum= glm(abor~news+ideol+religdummy,family=binomial, data=Students)
+anova(remlifedum, baseline6, test="LRT")
+```
+
+##Backwards Elimination- drop lifedummy
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model (modelafterback) is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+summary(modelafterback)
+
+#to verify significance 
+mabdrop1 =glm(abor~news+religdummy,family=binomial, data=Students)
+anova(mabdrop1, modelafterback, test= "LRT")
+mabdrop2 =glm(abor~news+ideol,family=binomial, data=Students)
+anova(mabdrop2, modelafterback, test= "LRT")
+mabdrop3 =glm(abor~religdummy+ideol,family=binomial, data=Students)
+anova(mabdrop3, modelafterback, test= "LRT")
+
+```
+
+#Table 2 shows results from backward elimination
+
+| Model     | Explanatory Variables | Deviance | df  | AIC   |
+|-----------|-----------------------|----------|-----|-------|
+| init      | *N+A+R+AF+I+L*        | 25.10    | 53  | 39.10 |
+| remnews   | *A+R+AF+I+L*          | 35.02    | 54  | 47.02 |
+| remaffil2 | *N+R+AF+I+L*          | 26.83    | 54  | 38.83 |
+| remrelig  | *N+AF+I+L*            | 30.50    | 55  | 40.50 |
+| remaffirm | *N+R+I+L*             | 27.12    | 55  | 37.12 |
+| remideol  | *N+R+L*               | 36.81    | 56  | 44.82 |
+| remlifedum| *N+R+I*               | 27.15    | 56  | 35.15 |
+
+Note: N = news, A= affil, R = relig, AF = affirm, I = ideol, L = life
+
+
+##Step 3: Add back in variables not included in Step 1 
+
+#Add gender
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with gender is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+addgender= glm(abor~gender+news+religdummy+ideol,family=binomial, data=Students)
+anova(modelafterback, addgender, test="LRT")
+```
+
+**Interpretation:** Gender not significant
+
+#Add age
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with age is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+addage= glm(abor~age+news+religdummy+ideol,family=binomial, data=Students)
+anova(addage, modelafterback, test="LRT")
+```
+
+**Interpretation:** Age not significant
+
+#Add hsgpa
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with hsgpa is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+addhsgpa= glm(abor~hsgpa+news+religdummy+ideol,family=binomial, data=Students)
+anova(addhsgpa, modelafterback, test="LRT")
+```
+
+**Interpretation:** hsgpa not significant based on .1 alpha, however we
+will keep it in mind later
+
+#Add cogpa
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with cogpa is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+addcogpa= glm(abor~cogpa+news+religdummy+ideol,family=binomial, data=Students)
+anova(addcogpa, modelafterback, test="LRT")
+```
+
+**Interpretation:** cogpa not significant
+
+#Add dhome
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with dhome is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+adddhome= glm(abor~dhome+news+religdummy+ideol,family=binomial, data=Students)
+anova(adddhome, modelafterback, test="LRT")
+```
+
+**Interpretation:** dhome not significant
+
+#Add dres
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with dres is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+addres= glm(abor~dres+news+religdummy+ideol,family=binomial, data=Students)
+anova(addres, modelafterback, test="LRT")
+```
+
+**Interpretation:** dres not significant
+
+#Add tv
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with religdummy is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+addtv= glm(abor~tv+news+religdummy+ideol,family=binomial, data=Students)
+anova(addtv, modelafterback, test="LRT")
+```
+
+**Interpretation:** tv not significant
+
+#Add sport
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with sport is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+addsport= glm(abor~sport+news+religdummy+ideol,family=binomial, data=Students)
+anova(addsport, modelafterback, test="LRT")
+```
+
+**Interpretation:** sport not significant
+
+#Add aids
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with aids is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+addaids= glm(abor~aids+news+religdummy+ideol,family=binomial, data=Students)
+anova(addaids, modelafterback, test="LRT")
+```
+
+**Interpretation:** aids not significant
+
+#Add veg
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Complex Model with veg is better
+
+```{r}
+modelafterback= glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+addveg= glm(abor~veg+news+religdummy+ideol,family=binomial, data=Students)
+anova(addveg, modelafterback, test="LRT")
+```
+
+**Interpretation:** veg not significant
+
+
+#Checking stepAIC for fun
+
+```{r}
+#library(MASS)
+#stepAIC(init)
+```
+
+#Step 4: Add interaction
+
+$H_0:$ Simple Model is better
+
+$H_a:$ Model with interaction is better
+
+```{r}
+testfinal = glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+testfinalint1 = glm(abor~news+religdummy+ideol+news*religdummy,family=binomial, data=Students)
+summary(testfinalint1)
+anova(testfinal, testfinalint1)
+```
+
+```{r}
+testfinalint2 = glm(abor~news+religdummy+ideol+news*ideol,family=binomial, data=Students)
+summary(testfinalint2)
+anova(testfinal, testfinalint2)
+```
+
+```{r}
+testfinalint3 = glm(abor~news+religdummy+ideol+religdummy*ideol,family=binomial, data=Students)
+summary(testfinalint3)
+anova(testfinal, testfinalint3)
+```
+
+# Final Model Selection
+
+```{r}
+Model404 <- glm(abor~news+religdummy+ideol,family=binomial, data=Students)
+summary(Model404)
+```
+
+### Goodness of Fit Test
+
+$H_0:$ The model provides an adequate fit to the data
+
+$H_a:$ The model does not adequately fit the data
+
+```{r}
+Goodness <- function(x) {
+  G1 <- x$deviance
+  df <- x$df.residual
+  pvalue <- pchisq(G1, df, lower.tail = FALSE)
+  cat("Deviance =", G1, "df =", df, " p-value =", pvalue, "\n")
+}
+
+Goodness(Model404)
+```
+
+**Interpretation:** p-value \> 0.05, we fail to reject $H_0$, suggesting
+the model fits adequately.
+
+### Global Test for Main Effects
+
+Test whether all predictors jointly have an effect:
+
+$H_0: \beta_{news} = \beta_{affil2} = \beta_{religdummy} = 0$
+
+$H_a:$ At least one $\beta_i \neq 0$
+
+```{r}
+anova(Model1, Model404, test="LRT")
+```
+
+**Decision:** p-value \< $\alpha = 0.05$, we reject $H_0$.
+
+**Conclusion:** We have enough evidence that at least one explanatory
+variable has an effect on abortion attitudes.
+
+#Residual test
+```{r}
+
+```
+
+
+### Train Test Split
+
+```{r}
+# We cant do as we created dummy variables
+```
+
+```{r}
+#ROC
+library(pROC) # Model with interaction
+rocplot <- roc(Students$abor ~ fitted(testfinalint3), data=Students)
+plot.roc(rocplot, legacy.axes=TRUE) 
+auc(rocplot)
+
+library(pROC) #Model 404 final model without interaction 
+rocplot <- roc(Students$abor ~ fitted(testfinal), data=Students)
+plot.roc(rocplot, legacy.axes=TRUE) 
+auc(rocplot)
+```
+```{r}
+summary(testfinal)
+summary(testfinalint3)
+```
+
+
+```{r}
+detach(Students)
+```
+
+**Conclusion:** Both models show excellent predictive power with AUC
+values above 0.9. The difference in AUC between the two models is 0.018,
+which is negligible.
+
+For practical purposes, both models perform similarly, and the choice
+between them should consider the balance between model complexity and
+interpretability. Given the similar predictive performance and the
+results, the simpler model without interaction (model404) may be
+preferred for its interpretability.
